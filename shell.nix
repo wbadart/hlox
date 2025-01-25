@@ -7,8 +7,12 @@ let
 in
 nixpkgs.mkShell {
   packages = with nixpkgs; [
-    cabal-install
-    ghc
-    haskell-language-server
+    ghcid
+    (ghc.withPackages (haskell-pkgs: with haskell-pkgs; [
+      bluefin
+      microlens
+
+      haskell-language-server
+    ]))
   ];
 }
