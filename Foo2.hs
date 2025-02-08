@@ -8,11 +8,14 @@ import Bluefin.Writer
 
 import Control.Monad (forM_, when)
 import Data.Bool (bool)
+import Data.Char (isAlpha, isAlphaNum, isDigit)
 import Data.Function ((&))
 import Data.Functor ((<&>), void)
+import Data.Maybe (fromMaybe)
 import System.Environment (getArgs)
 import System.Exit (ExitCode(..), exitWith)
 import System.IO (isEOF)
+import qualified Data.Map.Strict as M
 
 import Debug.Trace
 
@@ -39,7 +42,7 @@ tokens' s w script = do
   if done
     then do
       ScanState{scanResult=tokens, scanLine=line} <- get s
-      return (tokens <> [Token EOF "" line])
+      return (tokens <> [Token EOF (StringLexeme "") line])
     else do
       state@ScanState{scanCurrent=current} <- get s
       put s state{scanStart=current}
@@ -82,12 +85,16 @@ tokens' s w script = do
               eatComment
             else addToken s SLASH
 
-        ' ' -> pure ()
+        ' '  -> pure ()
         '\r' -> pure ()
         '\t' -> pure ()
         '\n' -> do
           state@ScanState{scanLine=line} <- get s
           put s state{scanLine=line + 1}
+
+        '"'                       -> string s w
+        c | isDigit c             -> number s
+        c | isAlpha c || c == '_' -> identifier s
 
         _ -> do
           ScanState{scanLine=line} <- get s
@@ -99,9 +106,17 @@ tokens' s w script = do
       put s state{scanCurrent=current + 1}
 
     addToken s tokenType = do
+      state@ScanState{scanResult=tokens, scanLine=line} <- get s
+      text <- currentSlice s
+      put s state{scanResult=tokens <> [Token tokenType (StringLexeme text) line]}
+
+    addToken' s tokenType text = do
       state@ScanState{scanResult=tokens, scanStart=start, scanCurrent=current, scanLine=line} <- get s
-      let text = substring start current script
       put s state{scanResult=tokens <> [Token tokenType text line]}
+
+    currentSlice s = do
+      ScanState{scanResult=tokens, scanStart=start, scanCurrent=current, scanLine=line} <- get s
+      return (substring start current script)
 
     substring :: Int -> Int -> String -> String
     substring start end string = take (end - start) $ drop start string
@@ -128,6 +143,65 @@ tokens' s w script = do
         then return '\0'
         else currentChar s
 
+    peekNext s = do
+      ScanState{scanCurrent=current} <- get s
+      if current + 1 >= length script
+        then return '\0'
+        else return (script !! (current + 1))
+
+    string s w = do
+      let loop = do
+            c <- peek s
+            done <- atEnd s
+            when (c /= '"' && not done) $ do
+              when (c == '\n') $ do
+                state@ScanState{scanLine=line} <- get s
+                put s state{scanLine=line + 1}
+              advance s
+              loop
+      loop
+      done <- atEnd s
+      if done
+        then do
+          ScanState{scanLine=line} <- get s
+          tell w [Error line "Unterminated string"]
+        else do
+          advance s
+          ScanState{scanStart=start, scanCurrent=current} <- get s
+          let value = substring (start + 1) (current - 1) script
+          addToken' s STRING (StringLexeme value)
+
+    number s = do
+      let loop = do
+            c <- peek s
+            when (isDigit c) $ do
+              advance s
+              loop
+      loop
+      c <- peek s
+      c' <- peekNext s
+      when (c == '.' && isDigit c') $ do
+        advance s
+        let loop = do
+              c <- peek s
+              when (isDigit c) $ do
+                advance s
+                loop
+        loop
+      text <- currentSlice s
+      addToken' s NUMBER $ NumLexeme (read text)
+
+    identifier s = do
+      let loop = do
+            c <- peek s
+            when (isAlphaNum c) $ do
+              advance s
+              loop
+      loop
+      text <- currentSlice s
+      let type_ = fromMaybe IDENTIFIER (M.lookup text keywords)
+      addToken s type_
+
 data ScanState = ScanState
   { scanStart :: Int
   , scanCurrent :: Int
@@ -138,9 +212,14 @@ data ScanState = ScanState
 
 data Token = Token
   { tokenType :: TokenType
-  , tokenLexeme :: String
+  , tokenLexeme :: Lexeme
   , tokenLine :: Int
   }
+  deriving Show
+
+data Lexeme
+  = StringLexeme String
+  | NumLexeme Double
   deriving Show
 
 data TokenType =
@@ -163,6 +242,26 @@ data TokenType =
 
   EOF
   deriving Show
+
+keywords :: M.Map String TokenType
+keywords = M.fromList
+  [ ("and",     AND)
+  , ("class",   CLASS)
+  , ("else",    ELSE)
+  , ("false",   FALSE)
+  , ("for",     FOR)
+  , ("fun",     FUN)
+  , ("if",      IF)
+  , ("nil",     NIL)
+  , ("or",      OR)
+  , ("print",   PRINT)
+  , ("return",  RETURN)
+  , ("super",   SUPER)
+  , ("this",    THIS)
+  , ("true",    TRUE)
+  , ("var",     VAR)
+  , ("while",   WHILE)
+  ]
 
 data Error = Error
   { errorLine :: Int
