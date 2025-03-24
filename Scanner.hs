@@ -2,7 +2,7 @@
 module Scanner where
 
 import Data.Char (isAlpha, isAlphaNum, isDigit)
-import Data.List (elemIndex)
+import Data.List (elemIndex, findIndex, isPrefixOf, tails)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map.Strict as M
 
@@ -38,6 +38,11 @@ tokens' line ('>'       : script) = ([], [Token GREATER       (StringLexeme ">")
 tokens' line ('/' : '/' : script) =
   let endOfComment = charIndexOrEnd '\n' script
   in tokens' line (drop endOfComment script)
+
+tokens' line ('/' : '*' : script) =
+  let endOfComment = substrIndexOrEnd "*/" script + length "*/"
+  in tokens' line (drop endOfComment script)
+
 tokens' line ('/' : script) = ([], [Token SLASH (StringLexeme "/") line]) <> tokens' line script
 
 tokens' line (' ' : script)  = tokens' line       script
@@ -139,6 +144,9 @@ charIndexOrEnd :: Eq c => c -> [c] -> Int
 charIndexOrEnd c string =
   let len = length string
   in min (fromMaybe len (elemIndex c string)) len
+
+substrIndexOrEnd :: Eq c => [c] -> [c] -> Int
+substrIndexOrEnd substr = fromMaybe 0 . findIndex (substr `isPrefixOf`) . tails
 
 elemCount :: Eq a => a -> [a] -> Int
 elemCount x = length . filter (== x)
