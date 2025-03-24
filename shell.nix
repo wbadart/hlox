@@ -10,6 +10,7 @@ nixpkgs.mkShell {
     ghcid
     (ghc.withPackages (haskell-pkgs: with haskell-pkgs; [
       bluefin
+      cabal-install
       microlens
 
       haskell-language-server
