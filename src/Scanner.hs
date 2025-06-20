@@ -13,7 +13,6 @@ tokens script =
     (errors, _)  -> Left errors
 
 tokens' :: Int -> String -> ([Error], [Token])
-
 tokens' line ""               = ([], [Token EOF         (StringLexeme "")  line])
 tokens' line (c@'(' : script) = ([], [Token LEFT_PAREN  (StringLexeme [c]) line]) <> tokens' line script
 tokens' line (c@')' : script) = ([], [Token RIGHT_PAREN (StringLexeme [c]) line]) <> tokens' line script
