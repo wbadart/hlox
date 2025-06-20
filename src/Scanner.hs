@@ -30,8 +30,8 @@ tokens' line ('!' : '=' : script) = ([], [Token BANG_EQUAL    (StringLexeme "!="
 tokens' line ('=' : '=' : script) = ([], [Token EQUAL_EQUAL   (StringLexeme "==") line]) <> tokens' line script
 tokens' line ('<' : '=' : script) = ([], [Token LESS_EQUAL    (StringLexeme "<=") line]) <> tokens' line script
 tokens' line ('>' : '=' : script) = ([], [Token GREATER_EQUAL (StringLexeme ">=") line]) <> tokens' line script
-tokens' line ('!'       : script) = ([], [Token BANG_EQUAL    (StringLexeme "!")  line]) <> tokens' line script
-tokens' line ('='       : script) = ([], [Token EQUAL_EQUAL   (StringLexeme "=")  line]) <> tokens' line script
+tokens' line ('!'       : script) = ([], [Token BANG          (StringLexeme "!")  line]) <> tokens' line script
+tokens' line ('='       : script) = ([], [Token EQUAL         (StringLexeme "=")  line]) <> tokens' line script
 tokens' line ('<'       : script) = ([], [Token LESS          (StringLexeme "<")  line]) <> tokens' line script
 tokens' line ('>'       : script) = ([], [Token GREATER       (StringLexeme ">")  line]) <> tokens' line script
 
